@@ -75,6 +75,7 @@ current_user = st.sidebar.selectbox("사용자 선택", user_list, key="user_sel
 
 # 기능 선택
 menu = st.sidebar.radio("기능 선택", [
+    "📁 전체 환자 관리",
     "📋 새 환자 등록",
     "📂 환자 목록 보기",
     "✅ 오늘 해야 할 검사",
@@ -105,12 +106,28 @@ def generate_schedule(patient):
     def is_environment(date):
         if 환경_사용 == "비착용":
             return False
-        return any(0 <= (date - d).days <= 30 for d in 외래일)
+        # 환경: baseline 기준 0일부터 4주, 이후 3,6,9,12개월의 앞단 4주
+        if baseline <= date <= baseline + timedelta(days=27):
+            return True
+        for m in [3, 6, 9, 12]:
+            check_day = baseline + relativedelta(months=+m)
+            start = check_day - timedelta(days=27)
+            if start <= date <= check_day:
+                return True
+        return False
 
     def is_wearable(date):
         if 웨어러블_사용 == "비착용":
             return False
-        return any(0 <= (date - d).days <= 13 for d in 외래일)
+        # 웨어러블: baseline 기준 0일부터 2주, 이후 3,6,9,12개월의 앞단 2주
+        if baseline <= date <= baseline + timedelta(days=13):
+            return True
+        for m in [3, 6, 9, 12]:
+            check_day = baseline + relativedelta(months=+m)
+            start = check_day - timedelta(days=13)
+            if start <= date <= check_day:
+                return True
+        return False
 
     df = pd.DataFrame({
         "환자번호": patient["환자번호"],
@@ -181,6 +198,11 @@ elif menu == "📂 환자 목록 보기":
         st.stop()
 
     선택 = st.selectbox("환자 선택", sorted(patient_db["환자번호"].unique()), key="patient_select")
+    if st.button("🗑️ 선택 환자 삭제"):
+        patient_db.drop(patient_db[patient_db["환자번호"] == 선택].index, inplace=True)
+        patient_db.to_csv(DATA_PATH, index=False)
+        st.success(f"{선택} 환자 정보가 삭제되었습니다.")
+        st.experimental_rerun()
     patient = patient_db[patient_db["환자번호"] == 선택].iloc[0]
 
     st.markdown("#### 📝 기본 정보")
@@ -273,6 +295,41 @@ elif menu == "📂 환자 목록 보기":
 
 
 # ✅ 오늘 해야 할 검사
+
+elif menu == "📁 전체 환자 관리":
+    st.subheader("📁 전체 환자 점오표 확인")
+    if patient_db.empty:
+        st.warning("등록된 환자가 없습니다.")
+        st.stop()
+    full_schedule = pd.concat([generate_schedule(row) for _, row in patient_db.iterrows()])
+    full_schedule["날짜"] = pd.to_datetime(full_schedule["날짜"])
+    melted = full_schedule.melt(
+        id_vars=["환자번호", "날짜"],
+        value_vars=["음성", "증상", "환경", "웨어러블"],
+        var_name="항목",
+        value_name="검사"
+    )
+    melted["날짜"] = pd.to_datetime(melted["날짜"]).dt.date
+    if os.path.exists("completed.csv"):
+        completed = pd.read_csv("completed.csv")
+        completed["날짜"] = pd.to_datetime(completed["날짜"]).dt.date
+        if "결과" in completed.columns:
+            merged = pd.merge(melted, completed, on=["환자번호", "항목", "날짜"], how="left")
+            merged["표시"] = merged.apply(lambda row: row["결과"] if pd.notna(row["결과"]) else row["검사"], axis=1)
+        else:
+            merged = melted.copy()
+            merged["표시"] = merged["검사"]
+    else:
+        merged = melted.copy()
+        merged["표시"] = merged["검사"]
+    점오표 = merged.pivot_table(
+        index=["환자번호", "항목"],
+        columns="날짜",
+        values="표시",
+        aggfunc="first",
+        fill_value=""
+    )
+    st.dataframe(점오표, use_container_width=True)
 elif menu == "✅ 오늘 해야 할 검사":
     st.subheader("✅ 오늘 해야 할 검사")
     today = datetime.today().date()
@@ -343,27 +400,45 @@ elif menu == "📌 내일 예정된 검사":
         st.dataframe(검사예정[["환자번호", "항목", "날짜"]], use_container_width=True)
 
 
-elif menu == "🗓️ 달력 뷰어":
+#elif menu == "🗓️ 달력 뷰어":
+if menu == "🗓️ 달력 뷰어":
     from streamlit_calendar import calendar
 
     st.subheader("🗓️ 달력 형태로 검사 일정 보기")
 
+    # 환자 필터
+    patient_ids = patient_db["환자번호"].unique().tolist()
+    selected_patient = st.selectbox("환자 선택", ["전체 보기"] + patient_ids)
+
     full = pd.concat([generate_schedule(r) for _, r in patient_db.iterrows()])
     full = filter_by_user(full, current_user)
+
+    if selected_patient != "전체 보기":
+        full = full[full["환자번호"] == selected_patient]
+
+    # 색상 매핑
+    color_map = {
+        "음성": "#FF6B6B",      # coral
+        "증상": "#4D96FF",      # blue
+        "환경": "#1DD1A1",      # mint
+        "웨어러블": "#FDCB6E"   # yellow
+    }
 
     events = []
     for _, row in full.iterrows():
         for 항목 in ["음성", "증상", "환경", "웨어러블"]:
             if row[항목] == "●":
                 events.append({
-                    "title": f"{항목}",
+                    "title": f"{row['환자번호']} - {항목}",
                     "start": str(row["날짜"]),
                     "end": str(row["날짜"]),
-                    "allDay": True
+                    "allDay": True,
+                    "color": color_map.get(항목, "gray")
                 })
 
     calendar_options = {"initialView": "dayGridMonth"}
     calendar(events=events, options=calendar_options)
+
 
 
 
