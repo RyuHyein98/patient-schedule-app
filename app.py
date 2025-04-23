@@ -16,13 +16,11 @@ def filter_by_user(df, user):
     ]
 
 
-
 # 파일 경로
 DATA_PATH = "patients.csv"
 DONE_PATH = "completed.csv"
 AUDIO_LINKS_PATH = "audio_links.csv"
 
-# Google Drive 음성 파일 링크 생성 함수
 
 def get_audio_file_link(patient_id, date, df):
     import pandas as pd
@@ -75,13 +73,13 @@ current_user = st.sidebar.selectbox("사용자 선택", user_list, key="user_sel
 
 # 기능 선택
 menu = st.sidebar.radio("기능 선택", [
-    "📁 전체 환자 관리",
-    "📋 새 환자 등록",
+    "📋 전체 환자 관리",
+    "🫁 새 환자 등록",
     "📂 환자 목록 보기",
-    "✅ 오늘 해야 할 검사",
-    "📌 내일 예정된 검사",
+    "👩🏻‍⚕️ 오늘 해야 할 검사",
+    "👩🏻‍⚕️ 내일 예정된 검사",
     "🗓️ 달력 뷰어",
-    "🗂️ 외래 일정 관리",
+    "🏥 외래 일정 관리",
     "📊 월별 검사 통계"
 ], key="menu_select")
 
@@ -145,8 +143,9 @@ def generate_schedule(patient):
     return df
 
 # 📋 새 환자 등록
-if menu == "📋 새 환자 등록":
+if menu == "🫁 새 환자 등록":
     st.subheader("📋 새 환자 등록")
+    
 
     with st.form("register_form"):
         col1, col2 = st.columns(2)
@@ -204,22 +203,76 @@ elif menu == "📂 환자 목록 보기":
         st.success(f"{선택} 환자 정보가 삭제되었습니다.")
         st.experimental_rerun()
     patient = patient_db[patient_db["환자번호"] == 선택].iloc[0]
-
-    st.markdown("#### 📝 기본 정보")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"- **환자번호:** {patient['환자번호']}")
-        st.markdown(f"- **Baseline:** {patient['Baseline']}")
-        st.markdown(f"- **Start_date:** {patient['Start_date']}")
-        st.markdown(f"- **외래일:** {patient['외래일']}")
-    with col2:
-        st.markdown(f"- **음성 주기:** {patient['음성_주기']} (담당자: {patient['음성_담당자']})")
-        st.markdown(f"- **증상 주기:** {patient['증상_주기']} (담당자: {patient['증상_담당자']})")
-        st.markdown(f"- **환경 착용:** {patient['환경_사용']} (담당자: {patient['환경_담당자']})")
-        st.markdown(f"- **웨어러블 착용:** {patient['웨어러블_사용']} (담당자: {patient['웨어러블_담당자']})")
-
     schedule = generate_schedule(patient)
-    schedule["날짜"] = pd.to_datetime(schedule["날짜"]).dt.date
+
+    # 👉 제목과 버튼 수평 정렬
+    col_title, col_button = st.columns([6, 1])
+    with col_title:
+        st.markdown("### 📝 기본 정보")
+    with col_button:
+        edit_mode = st.button("✏️ 수정", key="edit_toggle")
+
+    if not edit_mode:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"- **Baseline:** {patient['Baseline']}")
+            st.markdown(f"- **Start_date:** {patient['Start_date']}")
+            st.markdown(f"- **외래일:** {patient['외래일']}")
+        with col2:
+            st.markdown(f"- **음성 주기:** {patient['음성_주기']}")
+            st.markdown(f"- **증상 주기:** {patient['증상_주기']}")
+            st.markdown(f"- **환경 착용:** {patient['환경_사용']}")
+            st.markdown(f"- **웨어러블 착용:** {patient['웨어러블_사용']}")
+
+        st.markdown("#### 담당자")
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown(f"- 음성 담당자: {patient['음성_담당자']}")
+            st.markdown(f"- 증상 담당자: {patient['증상_담당자']}")
+        with col4:
+            st.markdown(f"- 환경 담당자: {patient['환경_담당자']}")
+            st.markdown(f"- 웨어러블 담당자: {patient['웨어러블_담당자']}")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            edit_baseline = st.date_input("Baseline", value=pd.to_datetime(patient['Baseline']).date(), key="edit_baseline")
+            edit_start = st.date_input("Start_date", value=pd.to_datetime(patient['Start_date']).date(), key="edit_start")
+            edit_outpatient = st.text_input("외래일 (|로 구분)", value=patient["외래일"], key="edit_outpatient")
+        with col2:
+            edit_voice = st.selectbox("음성 주기", ["1w", "2w", "1m"], index=["1w", "2w", "1m"].index(patient["음성_주기"]))
+            edit_symptom = st.selectbox("증상 주기", ["daily", "weekly"], index=["daily", "weekly"].index(patient["증상_주기"]))
+            edit_env = st.radio("환경 착용", ["착용", "비착용"], index=["착용", "비착용"].index(patient["환경_사용"]))
+            edit_wear = st.radio("웨어러블 착용", ["착용", "비착용"], index=["착용", "비착용"].index(patient["웨어러블_사용"]))
+
+        st.markdown("#### 담당자 수정")
+        col3, col4 = st.columns(2)
+        with col3:
+            edit_voice_staff = st.selectbox("음성 담당자", user_list[1:], index=user_list[1:].index(patient["음성_담당자"]))
+            edit_symptom_staff = st.selectbox("증상 담당자", user_list[1:], index=user_list[1:].index(patient["증상_담당자"]))
+        with col4:
+            edit_env_staff = st.selectbox("환경 담당자", user_list[1:], index=user_list[1:].index(patient["환경_담당자"]))
+            edit_wear_staff = st.selectbox("웨어러블 담당자", user_list[1:], index=user_list[1:].index(patient["웨어러블_담당자"]))
+
+        if st.button("💾 수정 내용 저장"):
+            patient_db.loc[patient_db["환자번호"] == 선택, :] = {
+                "환자번호": 선택,
+                "Baseline": edit_baseline.strftime("%Y-%m-%d"),
+                "Start_date": edit_start.strftime("%Y-%m-%d"),
+                "외래일": edit_outpatient,
+                "음성_주기": edit_voice,
+                "증상_주기": edit_symptom,
+                "환경_사용": edit_env,
+                "웨어러블_사용": edit_wear,
+                "음성_담당자": edit_voice_staff,
+                "증상_담당자": edit_symptom_staff,
+                "환경_담당자": edit_env_staff,
+                "웨어러블_담당자": edit_wear_staff
+            }
+            patient_db.to_csv(DATA_PATH, index=False)
+            st.success("기본 정보가 수정되었습니다.")
+            st.rerun()
+
+
 
     st.markdown("#### 🔍 검사 상태 필터링")
     검사_기간 = st.date_input("날짜 범위 선택", [datetime.today() - timedelta(days=14), datetime.today()], key="filter_date")
@@ -252,7 +305,7 @@ elif menu == "📂 환자 목록 보기":
     st.dataframe(pivot, use_container_width=True)
 
     # 완료/수동 처리
-    st.markdown("#### ✅ 완료된 검사 이력 / 수동 처리")
+    st.markdown("#### ✅ 검사 수동처리")
     검사필터 = st.selectbox("항목 필터", ["전체"] + 항목_필터, key="이력항목")
     날짜필터 = st.date_input("날짜 선택 (필터용)", value=datetime.today(), key="이력날짜")
 
@@ -293,11 +346,105 @@ elif menu == "📂 환자 목록 보기":
                 completed_db.to_csv(DONE_PATH, index=False)
                 st.rerun()
 
+    # ✅ 오늘 이전 날짜 중 완료되지 않은 검사 항목 자동 표시
+    st.markdown("#### ⏳ 미처리 검사 내역")
+    past_uncompleted = melted[
+        (melted["표시"] == "⚫") & 
+        (melted["날짜"] < datetime.today().date())
+    ]
+    if past_uncompleted.empty:
+        st.info("오늘 이전에 예정되었지만 완료되지 않은 검사가 없습니다.")
+    else:
+        for _, row in past_uncompleted.iterrows():
+            cols = st.columns([3, 2, 3])
+            cols[0].write(row["날짜"])
+            cols[1].write(row["항목"])
+            if cols[2].button("✅ 완료 처리", key=f"auto_manual_done_{row['날짜']}_{row['항목']}"):
+                completed_db.loc[len(completed_db)] = {
+                    "환자번호": 선택,
+                    "날짜": row["날짜"],
+                    "항목": row["항목"]
+                }
+                completed_db.to_csv(DONE_PATH, index=False)
+                st.rerun()
+
+
+
 
 # ✅ 오늘 해야 할 검사
 
-elif menu == "📁 전체 환자 관리":
+elif menu == "📋 전체 환자 관리":
     st.subheader("📁 전체 환자 점오표 확인")
+
+    # 📊 기본 통계
+    st.markdown("### 📊 등록 환자 기본 통계")
+
+    total_patients = len(patient_db)
+    st.write(f"**총 등록 환자 수:** {total_patients}명")
+
+    st.write("**각 항목별 검사 진행 환자 수**")
+
+    def count_active(df, column_name):
+        return df[df[column_name] != "비착용"].shape[0]
+
+    voice_count = patient_db[patient_db["음성_주기"].notnull()].shape[0]
+    symptom_count = patient_db[patient_db["증상_주기"].notnull()].shape[0]
+    environment_count = count_active(patient_db, "환경_사용")
+    wearable_count = count_active(patient_db, "웨어러블_사용")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("음성 검사 시행 환자 수", voice_count)
+        st.metric("환경 착용 환자 수", environment_count)
+    with col2:
+        st.metric("증상 검사 시행 환자 수", symptom_count)
+        st.metric("웨어러블 착용 환자 수", wearable_count)
+
+       # ▶️ 실시간 검사 진행률 / Drop률 요약표
+    st.markdown("### 🕒 검사 진행률 (오늘 기준)")
+
+    def get_progress_stats(item):
+        today = datetime.today().date()
+        all_sched = []
+        for _, row in patient_db.iterrows():
+            schedule = generate_schedule(row)
+            sch = schedule[schedule[item] == "●"].copy()
+            sch = sch[sch["날짜"] <= today]  # 오늘 이전 일정만
+            sch["환자번호"] = row["환자번호"]
+            all_sched.append(sch)
+        if not all_sched:
+            return 0, 0, 0, 0, 0
+        df_all = pd.concat(all_sched)
+        total_cnt = len(df_all)
+        if not completed_db.empty:
+            done = completed_db[completed_db["항목"] == item]
+            done = done[done["날짜"].apply(lambda x: pd.to_datetime(x).date() <= today)]
+            done_cnt = done.shape[0]
+        else:
+            done_cnt = 0
+        undone_cnt = total_cnt - done_cnt
+        progress = (done_cnt / total_cnt * 100) if total_cnt > 0 else 0
+        drop = (undone_cnt / total_cnt * 100) if total_cnt > 0 else 0
+        return total_cnt, done_cnt, undone_cnt, progress, drop
+
+    # 표 형태로 정리
+    progress_data = []
+
+    for 항목 in ["음성", "증상", "환경", "웨어러블"]:
+        total_cnt, done_cnt, undone_cnt, progress, drop = get_progress_stats(항목)
+        progress_data.append({
+            "검사 항목": 항목,
+            "예정건수": total_cnt,
+            "완료건수": done_cnt,
+            "미완료건수": undone_cnt,
+            "진행률(%)": f"{progress:.1f}",
+            "Drop률(%)": f"{drop:.1f}"
+        })
+
+    progress_df = pd.DataFrame(progress_data)
+    st.dataframe(progress_df, use_container_width=True)
+
+    # 점오표 생성
     if patient_db.empty:
         st.warning("등록된 환자가 없습니다.")
         st.stop()
@@ -322,6 +469,7 @@ elif menu == "📁 전체 환자 관리":
     else:
         merged = melted.copy()
         merged["표시"] = merged["검사"]
+
     점오표 = merged.pivot_table(
         index=["환자번호", "항목"],
         columns="날짜",
@@ -330,7 +478,11 @@ elif menu == "📁 전체 환자 관리":
         fill_value=""
     )
     st.dataframe(점오표, use_container_width=True)
-elif menu == "✅ 오늘 해야 할 검사":
+
+ 
+
+    
+elif menu == "👩🏻‍⚕️ 오늘 해야 할 검사":
     st.subheader("✅ 오늘 해야 할 검사")
     today = datetime.today().date()
 
@@ -378,8 +530,8 @@ elif menu == "✅ 오늘 해야 할 검사":
                 completed_db.to_csv(DONE_PATH, index=False)
                 st.rerun()
 
-# 📌 내일 예정된 검사
-elif menu == "📌 내일 예정된 검사":
+# 👩🏻‍⚕️ 내일 예정된 검사
+elif menu == "👩🏻‍⚕️ 내일 예정된 검사":
     st.subheader("📌 내일 예정된 검사")
     tomorrow = datetime.today().date() + timedelta(days=1)
 
@@ -442,7 +594,7 @@ if menu == "🗓️ 달력 뷰어":
 
 
 
-elif menu == "🗂️ 외래 일정 관리":
+elif menu == "🏥 외래 일정 관리":
     st.subheader("📅 외래 일정 확인 및 수정")
 
     today = datetime.today().date()
@@ -506,3 +658,23 @@ elif menu == "📊 월별 검사 통계":
 
     # 차트 시각화
     st.bar_chart(pivot.set_index("월"))
+
+
+# ✅ 기능 추가: 오늘 이전 날짜 + 완료되지 않은 항목 필터링
+from datetime import datetime, date
+
+def get_uncompleted_tests_before_today(test_data):
+    today = datetime.today().date()
+    return [test for test in test_data if test["date"] < today and not test["completed"]]
+
+# 예시 데이터 (실제 데이터에 맞게 적용 필요)
+example_tests = [
+    {"date": date(2025, 4, 20), "completed": False, "name": "혈액 검사"},
+    {"date": date(2025, 4, 22), "completed": True, "name": "소변 검사"},
+    {"date": date(2025, 4, 23), "completed": False, "name": "CT 촬영"},
+]
+
+uncompleted_tests = get_uncompleted_tests_before_today(example_tests)
+print("⏳ 완료되지 않은 이전 검사 목록:")
+for test in uncompleted_tests:
+    print(f"- {test['name']} (날짜: {test['date']})")
