@@ -40,7 +40,7 @@ if st.button("등록"):
         voice_freq,
         symptom_freq,
         env_use,
-        wearable_use,sa
+        wearable_use,
         voice_staff,
         symptom_staff,
         env_staff,
