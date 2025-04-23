@@ -12,7 +12,7 @@ from datetime import datetime
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
 client = gspread.authorize(creds)
-sheet = client.open_by_key("1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas").worksheet("시트1")
+sheet = client.open_by_key("1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas").worksheet("sheet1")
 
 # ✅ 입력 폼
 st.title("👤 새 환자 등록")
