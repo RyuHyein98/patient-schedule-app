@@ -3,6 +3,55 @@ import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import os
+import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+
+# ✅ 구글 시트 인증 및 연결
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+client = gspread.authorize(creds)
+sheet = client.open_by_key("1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas").worksheet("시트1")
+
+# ✅ 입력 폼
+st.title("👤 새 환자 등록")
+
+환자번호 = st.text_input("환자번호")
+baseline_date = st.date_input("Baseline")
+start_date = st.date_input("Start Date")
+outpatient_dates = st.text_input("외래일 (| 구분)")
+voice_freq = st.selectbox("음성 주기", ["1w", "2w", "1m"])
+symptom_freq = st.selectbox("증상 주기", ["daily", "weekly"])
+env_use = st.radio("환경 착용", ["착용", "비착용"])
+wearable_use = st.radio("웨어러블 착용", ["착용", "비착용"])
+voice_staff = st.text_input("음성 담당자")
+symptom_staff = st.text_input("증상 담당자")
+env_staff = st.text_input("환경 담당자")
+wearable_staff = st.text_input("웨어러블 담당자")
+
+# ✅ 등록 버튼 처리
+if st.button("등록"):
+    new_row = [
+        환자번호,
+        baseline_date.strftime("%Y-%m-%d"),
+        start_date.strftime("%Y-%m-%d"),
+        outpatient_dates,
+        voice_freq,
+        symptom_freq,
+        env_use,
+        wearable_use,sa
+        voice_staff,
+        symptom_staff,
+        env_staff,
+        wearable_staff
+    ]
+    try:
+        sheet.append_row(new_row)
+        st.success(f"{환자번호} 등록 완료 ✅")
+    except Exception as e:
+        st.error(f"❌ Google Sheets 업로드 실패: {e}")
+
 
 
 def filter_by_user(df, user):
@@ -678,3 +727,33 @@ uncompleted_tests = get_uncompleted_tests_before_today(example_tests)
 print("⏳ 완료되지 않은 이전 검사 목록:")
 for test in uncompleted_tests:
     print(f"- {test['name']} (날짜: {test['date']})")
+
+
+
+if st.button("등록"):
+    from google.oauth2.service_account import Credentials
+    import gspread
+
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+    client = gspread.authorize(creds)
+
+    # 정확한 문서 ID + 시트 탭 이름으로 지정
+    sheet = client.open_by_key("1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas").worksheet("시트1")
+
+    new_row = [
+        환자번호,
+        baseline_date.strftime("%Y-%m-%d"),
+        start_date.strftime("%Y-%m-%d"),
+        outpatient_dates,
+        voice_freq,
+        symptom_freq,
+        env_use,
+        wearable_use,
+        voice_staff,
+        symptom_staff,
+        env_staff,
+        wearable_staff
+    ]
+    sheet.append_row(new_row)
+    st.success("✅ Google Sheets에 환자 정보가 등록되었습니다.")
