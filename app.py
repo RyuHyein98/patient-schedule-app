@@ -4,6 +4,41 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import os
 
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
+
+# 🔐 구글 시트 인증
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+client = gspread.authorize(creds)
+
+# 📄 연결할 구글 시트
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas"
+worksheet = client.open_by_url(SHEET_URL).sheet1
+
+def load_data():
+    data = worksheet.get_all_records()
+    return pd.DataFrame(data)
+
+def save_patient(row):
+    worksheet.append_row(row)
+
+def update_patient(patient_id, updated_row):
+    df = load_data()
+    if patient_id not in df["환자번호"].values:
+        st.error("해당 환자를 찾을 수 없습니다.")
+        return
+    idx = df[df["환자번호"] == patient_id].index[0] + 2  # +2 for 1-based index + header row
+    worksheet.update(f"A{idx}:J{idx}", [updated_row])
+
+# 앱 시작
+st.title("🩺 환자 관리 시스템 (Google Sheets 연동)")
+
+menu = st.sidebar.selectbox("메뉴 선택", ["환자 등록", "환자 목록 보기"])
+
 
 def filter_by_user(df, user):
     if user == "전체 관리자":
