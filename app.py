@@ -451,8 +451,13 @@ elif menu == "🫁 전체 환자 관리":
 
     def count_active(df, column_name):
         return df[df[column_name] != "비착용"].shape[0]
-    
-                    # ▶️ 실시간 검사 진행률 / Drop률 요약표
+
+    voice_count = patient_db[patient_db["음성_주기"].notnull()].shape[0]
+    symptom_count = patient_db[patient_db["증상_주기"].notnull()].shape[0]
+    environment_count = count_active(patient_db, "환경_사용")
+    wearable_count = count_active(patient_db, "웨어러블_사용")
+
+                        # ▶️ 실시간 검사 진행률 / Drop률 요약표
     st.markdown("### 🕒 검사 진행률 (오늘 기준)")
 
     def get_progress_stats(item):
@@ -492,12 +497,6 @@ elif menu == "🫁 전체 환자 관리":
             "진행률(%)": f"{progress:.1f}",
             "Drop률(%)": f"{drop:.1f}"
         })
-
-
-    voice_count = patient_db[patient_db["음성_주기"].notnull()].shape[0]
-    symptom_count = patient_db[patient_db["증상_주기"].notnull()].shape[0]
-    environment_count = count_active(patient_db, "환경_사용")
-    wearable_count = count_active(patient_db, "웨어러블_사용")
 
 
     col1, col2 = st.columns(2)
