@@ -449,8 +449,23 @@ elif menu == "🫁 전체 환자 관리":
 
     st.write("**각 항목별 검사 진행 환자 수**")
 
-                            # ▶️ 실시간 검사 진행률 / Drop률 요약표
+    # ▶️ 실시간 검사 진행률 / Drop률 요약표
     st.markdown("### 🕒 검사 진행률 (오늘 기준)")
+
+
+    # 표 형태로 정리
+    progress_data = []
+
+    for 항목 in ["음성", "증상", "환경", "웨어러블"]:
+        total_cnt, done_cnt, undone_cnt, progress, drop = get_progress_stats(항목)
+        progress_data.append({
+            "검사 항목": 항목,
+            "예정건수": total_cnt,
+            "완료건수": done_cnt,
+            "미완료건수": undone_cnt,
+            "진행률(%)": f"{progress:.1f}",
+            "Drop률(%)": f"{drop:.1f}"
+        })
 
     def get_progress_stats(item):
         today = datetime.today().date()
@@ -475,21 +490,7 @@ elif menu == "🫁 전체 환자 관리":
         progress = (done_cnt / total_cnt * 100) if total_cnt > 0 else 0
         drop = (undone_cnt / total_cnt * 100) if total_cnt > 0 else 0
         return total_cnt, done_cnt, undone_cnt, progress, drop
-
-    # 표 형태로 정리
-    progress_data = []
-
-    for 항목 in ["음성", "증상", "환경", "웨어러블"]:
-        total_cnt, done_cnt, undone_cnt, progress, drop = get_progress_stats(항목)
-        progress_data.append({
-            "검사 항목": 항목,
-            "예정건수": total_cnt,
-            "완료건수": done_cnt,
-            "미완료건수": undone_cnt,
-            "진행률(%)": f"{progress:.1f}",
-            "Drop률(%)": f"{drop:.1f}"
-        })
-
+    
     def count_active(df, column_name):
         return df[df[column_name] != "비착용"].shape[0]
 
