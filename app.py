@@ -35,7 +35,7 @@ def update_patient(patient_id, updated_row):
     worksheet.update(f"A{idx}:J{idx}", [updated_row])
 
 # 앱 시작
-st.title("🩺 환자 관리 시스템 (Google Sheets 연동)")
+st.title("👩🏻‍⚕️ 환자 관리 시스템 ")
 
 menu = st.sidebar.selectbox("메뉴 선택", ["환자 등록", "환자 목록 보기"])
 
@@ -110,7 +110,7 @@ current_user = st.sidebar.selectbox("사용자 선택", user_list, key="user_sel
 
 # 기능 선택
 menu = st.sidebar.radio("기능 선택", [
-    "📁 전체 환자 관리",
+    "🫁 전체 환자 관리",
     "📋 새 환자 등록",
     "📂 환자 목록 보기",
     "✅ 오늘 해야 할 검사",
@@ -438,11 +438,8 @@ elif menu == "📂 환자 목록 보기":
 
 
 
-
-# ✅ 오늘 해야 할 검사
-
-elif menu == "📁 전체 환자 관리":
-    st.subheader("📁 전체 환자 점오표 확인")
+elif menu == "🫁 전체 환자 관리":
+    st.subheader("📁 전체 환자 점오표 확인") 
 
     # 📊 기본 통계
     st.markdown("### 📊 등록 환자 기본 통계")
@@ -461,7 +458,7 @@ elif menu == "📁 전체 환자 관리":
     wearable_count = count_active(patient_db, "웨어러블_사용")
 
                 # ▶️ 실시간 검사 진행률 / Drop률 요약표
-    st.markdown("### 🕒 검사 진행률 / Drop률 요약표 (오늘 기준)")
+    st.markdown("### 🕒 검사 진행률 (오늘 기준)")
 
     def get_progress_stats(item):
         today = datetime.today().date()
