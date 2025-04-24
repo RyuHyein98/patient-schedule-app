@@ -16,7 +16,7 @@ creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"],
 client = gspread.authorize(creds)
 
 # 📄 연결할 구글 시트
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas/edit?gid=0#gid=0"
 worksheet = client.open_by_url(SHEET_URL).sheet1
 
 def load_data():
