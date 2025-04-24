@@ -4,41 +4,6 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import os
 
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-import gspread
-from google.oauth2.service_account import Credentials
-
-# 🔐 구글 시트 인증
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-client = gspread.authorize(creds)
-
-# 📄 연결할 구글 시트
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas/edit?gid=0#gid=0"
-worksheet = client.open_by_url(SHEET_URL).sheet1
-
-def load_data():
-    data = worksheet.get_all_records()
-    return pd.DataFrame(data)
-
-def save_patient(row):
-    worksheet.append_row(row)
-
-def update_patient(patient_id, updated_row):
-    df = load_data()
-    if patient_id not in df["환자번호"].values:
-        st.error("해당 환자를 찾을 수 없습니다.")
-        return
-    idx = df[df["환자번호"] == patient_id].index[0] + 2  # +2 for 1-based index + header row
-    worksheet.update(f"A{idx}:J{idx}", [updated_row])
-
-# 앱 시작
-st.title("👩🏻‍⚕️ 환자 관리 시스템 ")
-
-menu = st.sidebar.selectbox("메뉴 선택", ["환자 등록", "환자 목록 보기"])
-
 
 def filter_by_user(df, user):
     if user == "전체 관리자":
@@ -110,7 +75,7 @@ current_user = st.sidebar.selectbox("사용자 선택", user_list, key="user_sel
 
 # 기능 선택
 menu = st.sidebar.radio("기능 선택", [
-    "🫁 전체 환자 관리",
+    "📁 전체 환자 관리",
     "📋 새 환자 등록",
     "📂 환자 목록 보기",
     "✅ 오늘 해야 할 검사",
@@ -221,29 +186,9 @@ if menu == "📋 새 환자 등록":
                 "환경_담당자": 환경_담당자,
                 "웨어러블_담당자": 웨어러블_담당자
             }
-
-            # ✅ 로컬 CSV 저장
             patient_db.loc[len(patient_db)] = new_data
             patient_db.to_csv(DATA_PATH, index=False)
-
-            # ✅ Google Sheets에 업로드
-            worksheet.append_row([
-                환자번호,
-                baseline.strftime("%Y-%m-%d"),
-                start_date.strftime("%Y-%m-%d"),
-                외래1차.strftime("%Y-%m-%d"),
-                음성_주기,
-                증상_주기,
-                환경_사용,
-                웨어러블_사용,
-                음성_담당자,
-                증상_담당자,
-                환경_담당자,
-                웨어러블_담당자
-            ])
-
             st.success(f"{환자번호} 등록 완료")
-
 
 elif menu == "📂 환자 목록 보기":
     st.subheader("📂 환자 목록 보기")
@@ -436,32 +381,13 @@ elif menu == "📂 환자 목록 보기":
                 completed_db.to_csv(DONE_PATH, index=False)
                 st.rerun()
 
-elif menu == "🫁 전체 환자 관리":
-    st.subheader("📁 전체 환자 점오표 확인") 
 
-    # ▶️ 실시간 검사 진행률 / Drop률 요약표
-    st.markdown("### 🕒 검사 진행률 (오늘 기준)")
 
-    def get_progress_stats(item):
-        ...
-        return total_cnt, done_cnt, undone_cnt, progress, drop
 
-    # 표 형태로 정리
-    progress_data = []
+# ✅ 오늘 해야 할 검사
 
-    for 항목 in ["음성", "증상", "환경", "웨어러블"]:
-        total_cnt, done_cnt, undone_cnt, progress, drop = get_progress_stats(항목)
-        progress_data.append({
-            "검사 항목": 항목,
-            "예정건수": total_cnt,
-            "완료건수": done_cnt,
-            "미완료건수": undone_cnt,
-            "진행률(%)": f"{progress:.1f}",
-            "Drop률(%)": f"{drop:.1f}"
-        })
-
-    progress_df = pd.DataFrame(progress_data)
-    st.dataframe(progress_df, use_container_width=True)
+elif menu == "📁 전체 환자 관리":
+    st.subheader("📁 전체 환자 점오표 확인")
 
     # 📊 기본 통계
     st.markdown("### 📊 등록 환자 기본 통계")
@@ -479,6 +405,47 @@ elif menu == "🫁 전체 환자 관리":
     environment_count = count_active(patient_db, "환경_사용")
     wearable_count = count_active(patient_db, "웨어러블_사용")
 
+                # ▶️ 실시간 검사 진행률 / Drop률 요약표
+    st.markdown("### 🕒 검사 진행률 / Drop률 요약표 (오늘 기준)")
+
+    def get_progress_stats(item):
+        today = datetime.today().date()
+        all_sched = []
+        for _, row in patient_db.iterrows():
+            schedule = generate_schedule(row)
+            sch = schedule[schedule[item] == "●"].copy()
+            sch = sch[sch["날짜"] <= today]  # 오늘 이전 일정만
+            sch["환자번호"] = row["환자번호"]
+            all_sched.append(sch)
+        if not all_sched:
+            return 0, 0, 0, 0, 0
+        df_all = pd.concat(all_sched)
+        total_cnt = len(df_all)
+        if not completed_db.empty:
+            done = completed_db[completed_db["항목"] == item]
+            done = done[done["날짜"].apply(lambda x: pd.to_datetime(x).date() <= today)]
+            done_cnt = done.shape[0]
+        else:
+            done_cnt = 0
+        undone_cnt = total_cnt - done_cnt
+        progress = (done_cnt / total_cnt * 100) if total_cnt > 0 else 0
+        drop = (undone_cnt / total_cnt * 100) if total_cnt > 0 else 0
+        return total_cnt, done_cnt, undone_cnt, progress, drop
+
+    # 표 형태로 정리
+    progress_data = []
+
+    for 항목 in ["음성", "증상", "환경", "웨어러블"]:
+        total_cnt, done_cnt, undone_cnt, progress, drop = get_progress_stats(항목)
+        progress_data.append({
+            "검사 항목": 항목,
+            "예정건수": total_cnt,
+            "완료건수": done_cnt,
+            "미완료건수": undone_cnt,
+            "진행률(%)": f"{progress:.1f}",
+            "Drop률(%)": f"{drop:.1f}"
+        })
+
     col1, col2 = st.columns(2)
     with col1:
         st.metric("음성 검사 시행 환자 수", voice_count)
@@ -490,7 +457,6 @@ elif menu == "🫁 전체 환자 관리":
     if patient_db.empty:
         st.warning("등록된 환자가 없습니다.")
         st.stop()
-
     full_schedule = pd.concat([generate_schedule(row) for _, row in patient_db.iterrows()])
     full_schedule["날짜"] = pd.to_datetime(full_schedule["날짜"])
     melted = full_schedule.melt(
@@ -500,13 +466,21 @@ elif menu == "🫁 전체 환자 관리":
         value_name="검사"
     )
 
+
+
     melted["날짜"] = pd.to_datetime(melted["날짜"]).dt.date
     if os.path.exists("completed.csv"):
-        ...
+        completed = pd.read_csv("completed.csv")
+        completed["날짜"] = pd.to_datetime(completed["날짜"]).dt.date
+        if "결과" in completed.columns:
+            merged = pd.merge(melted, completed, on=["환자번호", "항목", "날짜"], how="left")
+            merged["표시"] = merged.apply(lambda row: row["결과"] if pd.notna(row["결과"]) else row["검사"], axis=1)
+        else:
+            merged = melted.copy()
+            merged["표시"] = merged["검사"]
     else:
         merged = melted.copy()
         merged["표시"] = merged["검사"]
-
     점오표 = merged.pivot_table(
         index=["환자번호", "항목"],
         columns="날짜",
@@ -518,6 +492,8 @@ elif menu == "🫁 전체 환자 관리":
 
 
 
+    progress_df = pd.DataFrame(progress_data)
+    st.dataframe(progress_df, use_container_width=True)
 
 elif menu == "✅ 오늘 해야 할 검사":
     st.subheader("✅ 오늘 해야 할 검사")
