@@ -3,55 +3,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import os
-import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
-from datetime import datetime
-
-# ✅ 구글 시트 인증 및 연결
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
-client = gspread.authorize(creds)
-sheet = client.open_by_key("1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas").worksheet("sheet1")
-
-# ✅ 입력 폼
-st.title("👤 새 환자 등록")
-
-환자번호 = st.text_input("환자번호")
-baseline_date = st.date_input("Baseline")
-start_date = st.date_input("Start Date")
-outpatient_dates = st.text_input("외래일 (| 구분)")
-voice_freq = st.selectbox("음성 주기", ["1w", "2w", "1m"])
-symptom_freq = st.selectbox("증상 주기", ["daily", "weekly"])
-env_use = st.radio("환경 착용", ["착용", "비착용"])
-wearable_use = st.radio("웨어러블 착용", ["착용", "비착용"])
-voice_staff = st.text_input("음성 담당자")
-symptom_staff = st.text_input("증상 담당자")
-env_staff = st.text_input("환경 담당자")
-wearable_staff = st.text_input("웨어러블 담당자")
-
-# ✅ 등록 버튼 처리
-if st.button("등록"):
-    new_row = [
-        환자번호,
-        baseline_date.strftime("%Y-%m-%d"),
-        start_date.strftime("%Y-%m-%d"),
-        outpatient_dates,
-        voice_freq,
-        symptom_freq,
-        env_use,
-        wearable_use,
-        voice_staff,
-        symptom_staff,
-        env_staff,
-        wearable_staff
-    ]
-    try:
-        sheet.append_row(new_row)
-        st.success(f"{환자번호} 등록 완료 ✅")
-    except Exception as e:
-        st.error(f"❌ Google Sheets 업로드 실패: {e}")
-
 
 
 def filter_by_user(df, user):
@@ -65,11 +16,13 @@ def filter_by_user(df, user):
     ]
 
 
+
 # 파일 경로
 DATA_PATH = "patients.csv"
 DONE_PATH = "completed.csv"
 AUDIO_LINKS_PATH = "audio_links.csv"
 
+# Google Drive 음성 파일 링크 생성 함수
 
 def get_audio_file_link(patient_id, date, df):
     import pandas as pd
@@ -122,13 +75,13 @@ current_user = st.sidebar.selectbox("사용자 선택", user_list, key="user_sel
 
 # 기능 선택
 menu = st.sidebar.radio("기능 선택", [
-    "📋 전체 환자 관리",
-    "🫁 새 환자 등록",
+    "📁 전체 환자 관리",
+    "📋 새 환자 등록",
     "📂 환자 목록 보기",
-    "👩🏻‍⚕️ 오늘 해야 할 검사",
-    "👩🏻‍⚕️ 내일 예정된 검사",
+    "✅ 오늘 해야 할 검사",
+    "📌 내일 예정된 검사",
     "🗓️ 달력 뷰어",
-    "🏥 외래 일정 관리",
+    "🗂️ 외래 일정 관리",
     "📊 월별 검사 통계"
 ], key="menu_select")
 
@@ -192,9 +145,8 @@ def generate_schedule(patient):
     return df
 
 # 📋 새 환자 등록
-if menu == "🫁 새 환자 등록":
+if menu == "📋 새 환자 등록":
     st.subheader("📋 새 환자 등록")
-    
 
     with st.form("register_form"):
         col1, col2 = st.columns(2)
@@ -354,7 +306,7 @@ elif menu == "📂 환자 목록 보기":
     st.dataframe(pivot, use_container_width=True)
 
     # 완료/수동 처리
-    st.markdown("#### ✅ 검사 수동처리")
+    st.markdown("#### ✅ 완료된 검사 이력 / 수동 처리")
     검사필터 = st.selectbox("항목 필터", ["전체"] + 항목_필터, key="이력항목")
     날짜필터 = st.date_input("날짜 선택 (필터용)", value=datetime.today(), key="이력날짜")
 
@@ -396,7 +348,7 @@ elif menu == "📂 환자 목록 보기":
                 st.rerun()
 
     # ✅ 오늘 이전 날짜 중 완료되지 않은 검사 항목 자동 표시
-    st.markdown("#### ⏳ 미처리 검사 내역")
+    st.markdown("#### ⏳ 미처리 검사 자동 리스트업")
     past_uncompleted = melted[
         (melted["표시"] == "⚫") & 
         (melted["날짜"] < datetime.today().date())
@@ -422,7 +374,7 @@ elif menu == "📂 환자 목록 보기":
 
 # ✅ 오늘 해야 할 검사
 
-elif menu == "📋 전체 환자 관리":
+elif menu == "📁 전체 환자 관리":
     st.subheader("📁 전체 환자 점오표 확인")
 
     # 📊 기본 통계
@@ -449,51 +401,6 @@ elif menu == "📋 전체 환자 관리":
         st.metric("증상 검사 시행 환자 수", symptom_count)
         st.metric("웨어러블 착용 환자 수", wearable_count)
 
-       # ▶️ 실시간 검사 진행률 / Drop률 요약표
-    st.markdown("### 🕒 검사 진행률 (오늘 기준)")
-
-    def get_progress_stats(item):
-        today = datetime.today().date()
-        all_sched = []
-        for _, row in patient_db.iterrows():
-            schedule = generate_schedule(row)
-            sch = schedule[schedule[item] == "●"].copy()
-            sch = sch[sch["날짜"] <= today]  # 오늘 이전 일정만
-            sch["환자번호"] = row["환자번호"]
-            all_sched.append(sch)
-        if not all_sched:
-            return 0, 0, 0, 0, 0
-        df_all = pd.concat(all_sched)
-        total_cnt = len(df_all)
-        if not completed_db.empty:
-            done = completed_db[completed_db["항목"] == item]
-            done = done[done["날짜"].apply(lambda x: pd.to_datetime(x).date() <= today)]
-            done_cnt = done.shape[0]
-        else:
-            done_cnt = 0
-        undone_cnt = total_cnt - done_cnt
-        progress = (done_cnt / total_cnt * 100) if total_cnt > 0 else 0
-        drop = (undone_cnt / total_cnt * 100) if total_cnt > 0 else 0
-        return total_cnt, done_cnt, undone_cnt, progress, drop
-
-    # 표 형태로 정리
-    progress_data = []
-
-    for 항목 in ["음성", "증상", "환경", "웨어러블"]:
-        total_cnt, done_cnt, undone_cnt, progress, drop = get_progress_stats(항목)
-        progress_data.append({
-            "검사 항목": 항목,
-            "예정건수": total_cnt,
-            "완료건수": done_cnt,
-            "미완료건수": undone_cnt,
-            "진행률(%)": f"{progress:.1f}",
-            "Drop률(%)": f"{drop:.1f}"
-        })
-
-    progress_df = pd.DataFrame(progress_data)
-    st.dataframe(progress_df, use_container_width=True)
-
-    # 점오표 생성
     if patient_db.empty:
         st.warning("등록된 환자가 없습니다.")
         st.stop()
@@ -518,7 +425,6 @@ elif menu == "📋 전체 환자 관리":
     else:
         merged = melted.copy()
         merged["표시"] = merged["검사"]
-
     점오표 = merged.pivot_table(
         index=["환자번호", "항목"],
         columns="날짜",
@@ -527,11 +433,7 @@ elif menu == "📋 전체 환자 관리":
         fill_value=""
     )
     st.dataframe(점오표, use_container_width=True)
-
- 
-
-    
-elif menu == "👩🏻‍⚕️ 오늘 해야 할 검사":
+elif menu == "✅ 오늘 해야 할 검사":
     st.subheader("✅ 오늘 해야 할 검사")
     today = datetime.today().date()
 
@@ -579,8 +481,8 @@ elif menu == "👩🏻‍⚕️ 오늘 해야 할 검사":
                 completed_db.to_csv(DONE_PATH, index=False)
                 st.rerun()
 
-# 👩🏻‍⚕️ 내일 예정된 검사
-elif menu == "👩🏻‍⚕️ 내일 예정된 검사":
+# 📌 내일 예정된 검사
+elif menu == "📌 내일 예정된 검사":
     st.subheader("📌 내일 예정된 검사")
     tomorrow = datetime.today().date() + timedelta(days=1)
 
@@ -643,7 +545,7 @@ if menu == "🗓️ 달력 뷰어":
 
 
 
-elif menu == "🏥 외래 일정 관리":
+elif menu == "🗂️ 외래 일정 관리":
     st.subheader("📅 외래 일정 확인 및 수정")
 
     today = datetime.today().date()
@@ -727,33 +629,3 @@ uncompleted_tests = get_uncompleted_tests_before_today(example_tests)
 print("⏳ 완료되지 않은 이전 검사 목록:")
 for test in uncompleted_tests:
     print(f"- {test['name']} (날짜: {test['date']})")
-
-
-
-if st.button("등록"):
-    from google.oauth2.service_account import Credentials
-    import gspread
-
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
-    client = gspread.authorize(creds)
-
-    # 정확한 문서 ID + 시트 탭 이름으로 지정
-    sheet = client.open_by_key("1rDlVNsJrPHB5cjLsAJpqTRH_WEsUBVrqU61CtQVMZas").worksheet("시트1")
-
-    new_row = [
-        환자번호,
-        baseline_date.strftime("%Y-%m-%d"),
-        start_date.strftime("%Y-%m-%d"),
-        outpatient_dates,
-        voice_freq,
-        symptom_freq,
-        env_use,
-        wearable_use,
-        voice_staff,
-        symptom_staff,
-        env_staff,
-        wearable_staff
-    ]
-    sheet.append_row(new_row)
-    st.success("✅ Google Sheets에 환자 정보가 등록되었습니다.")
