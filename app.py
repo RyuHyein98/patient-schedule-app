@@ -269,10 +269,14 @@ if menu == "📁 전체 환자 관리":
 
 
 # user_list = ["전체 관리자", "김은선", "최민지"]  
+# 📋 새 환자 등록
+# 사용자 목록 정의 (예시)
+user_list = ["전체 관리자", "김은선", "최민지"]  # 예시 사용자 목록, 실제 데이터로 교체해야 합니다.
+
 if menu == "📋 새 환자 등록":
     st.subheader("📋 새 환자 등록")
 
-    with st.form("register_form"):
+    with st.form("register_form"):  # 폼 시작
         col1, col2 = st.columns(2)
         with col1:
             환자번호 = st.text_input("환자번호")
@@ -288,13 +292,13 @@ if menu == "📋 새 환자 등록":
         st.markdown("#### 담당자 지정")
         col3, col4 = st.columns(2)
         with col3:
-            음성_담당자 = st.selectbox("음성 담당자", user_list[1:], key="staff_voice")
-            증상_담당자 = st.selectbox("증상 담당자", user_list[1:], key="staff_symptom")
+            음성_담당자 = st.selectbox("음성 담당자", user_list[1:], key="staff_voice")  # user_list 사용
+            증상_담당자 = st.selectbox("증상 담당자", user_list[1:], key="staff_symptom")  # user_list 사용
         with col4:
-            환경_담당자 = st.selectbox("환경 담당자", user_list[1:], key="staff_env")
-            웨어러블_담당자 = st.selectbox("웨어러블 담당자", user_list[1:], key="staff_wear")
+            환경_담당자 = st.selectbox("환경 담당자", user_list[1:], key="staff_env")  # user_list 사용
+            웨어러블_담당자 = st.selectbox("웨어러블 담당자", user_list[1:], key="staff_wear")  # user_list 사용
 
-        제출 = st.form_submit_button("등록 완료")
+        제출 = st.form_submit_button("등록 완료")  # submit button 추가
         if 제출:
             new_data = {
                 "환자번호": 환자번호,
@@ -310,10 +314,12 @@ if menu == "📋 새 환자 등록":
                 "환경_담당자": 환경_담당자,
                 "웨어러블_담당자": 웨어러블_담당자
             }
-   
+
+            # ✅ 로컬 CSV 저장
             patient_db.loc[len(patient_db)] = new_data
             patient_db.to_csv(DATA_PATH, index=False)
-    
+
+            # ✅ Google Sheets에 업로드
             worksheet.append_row([
                 환자번호,
                 baseline.strftime("%Y-%m-%d"),
@@ -333,10 +339,12 @@ if menu == "📋 새 환자 등록":
 
 
 
-if os.path.exists(DONE_PATH):
-    completed_db = pd.read_csv(DONE_PATH)
-else:
-    completed_db = pd.DataFrame(columns=["환자번호", "날짜", "항목"])
+
+
+#if os.path.exists(DONE_PATH):
+#    completed_db = pd.read_csv(DONE_PATH)
+#else:
+#    completed_db = pd.DataFrame(columns=["환자번호", "날짜", "항목"])
 
 
 
